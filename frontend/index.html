@@ -58,6 +58,19 @@
             <label for="date">Date</label>
             <input type="date" id="date" name="date" required />
           </div>
+          <div class="form-group">
+            <label for="recurrence">Repeat</label>
+            <select id="recurrence" name="recurrence">
+              <option value="none" selected>Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="recurrence-end-group">
+            <label for="recurrence-end-date">Repeat Until (optional)</label>
+            <input type="date" id="recurrence-end-date" name="recurrence-end-date" />
+          </div>
           <button type="submit" class="btn-primary">Add Expense</button>
           <p class="form-error" id="form-error"></p>
         </form>
@@ -95,6 +108,15 @@
       </div>
       <div id="expense-list">
         <p class="empty-state">No expenses found. Add your first expense above!</p>
+      </div>
+    </section>
+
+    <section class="panel" id="recurring-panel">
+      <div class="list-header">
+        <h2>Recurring Schedules</h2>
+      </div>
+      <div id="recurring-list">
+        <p class="empty-state">No recurring schedules yet.</p>
       </div>
     </section>
   </main>

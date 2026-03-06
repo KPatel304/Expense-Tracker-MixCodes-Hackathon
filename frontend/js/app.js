@@ -88,6 +88,20 @@ function getTodayIsoDate() {
   return local.toISOString().split('T')[0];
 }
 
+function recurrenceLabel(recurrence) {
+  if (recurrence === 'daily') return 'Repeats daily';
+  if (recurrence === 'weekly') return 'Repeats weekly';
+  if (recurrence === 'monthly') return 'Repeats monthly';
+  return '';
+}
+
+function shortRecurrenceLabel(recurrence) {
+  if (recurrence === 'daily') return 'Daily';
+  if (recurrence === 'weekly') return 'Weekly';
+  if (recurrence === 'monthly') return 'Monthly';
+  return 'None';
+}
+
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
 async function apiFetch(path, options = {}) {
@@ -263,6 +277,15 @@ async function loadExpenses() {
   }
 }
 
+async function loadRecurringRules() {
+  try {
+    const rules = await apiFetch('/recurring-rules');
+    renderRecurringRules(rules);
+  } catch (e) {
+    console.error('Failed to load recurring rules', e);
+  }
+}
+
 function renderExpenseList(expenses) {
   const container = document.getElementById('expense-list');
   if (expenses.length === 0) {
@@ -275,6 +298,9 @@ function renderExpenseList(expenses) {
     const date = new Date(expense.date + 'T00:00:00').toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
     });
+    const recurringBadge = expense.recurrence && expense.recurrence !== 'none'
+      ? `<span class="expense-recurring-badge">🔁 ${recurrenceLabel(expense.recurrence)}</span>`
+      : '';
     return `
       <div class="expense-item" data-id="${expense.id}">
         <div class="expense-icon cat-${expense.category}">${icon}</div>
@@ -282,6 +308,7 @@ function renderExpenseList(expenses) {
           <div class="expense-description">${escapeHtml(expense.description)}</div>
           <div class="expense-meta">
             <span class="expense-category-badge cat-${expense.category}">${expense.category}</span>
+            ${recurringBadge}
             &nbsp;${date}
           </div>
         </div>
@@ -306,6 +333,54 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function renderRecurringRules(rules) {
+  const container = document.getElementById('recurring-list');
+
+  if (rules.length === 0) {
+    container.innerHTML = '<p class="empty-state">No recurring schedules yet.</p>';
+    return;
+  }
+
+  container.innerHTML = rules.map(rule => {
+    const nextDate = new Date(rule.nextDate + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+
+    const endDate = rule.endDate
+      ? new Date(rule.endDate + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+      })
+      : 'No end date';
+
+    return `
+      <div class="recurring-item" data-id="${rule.id}">
+        <div class="recurring-info">
+          <div class="recurring-title">${escapeHtml(rule.description)} · ${fmt(rule.amount)}</div>
+          <div class="recurring-meta">
+            <span class="expense-category-badge cat-${rule.category}">${rule.category}</span>
+            <span class="expense-recurring-badge">🔁 ${shortRecurrenceLabel(rule.recurrence)}</span>
+            &nbsp;Next: ${nextDate} · Ends: ${endDate}
+            ${rule.paused ? '&nbsp;· Paused' : ''}
+          </div>
+        </div>
+        <div class="recurring-actions">
+          <button class="btn-secondary btn-toggle-rule" data-id="${rule.id}" data-paused="${String(rule.paused)}">
+            ${rule.paused ? 'Resume' : 'Pause'}
+          </button>
+          <button class="btn-secondary btn-delete-rule" data-id="${rule.id}">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.btn-toggle-rule').forEach(btn => {
+    btn.addEventListener('click', () => toggleRecurringRule(btn.dataset.id, btn.dataset.paused === 'true'));
+  });
+
+  container.querySelectorAll('.btn-delete-rule').forEach(btn => {
+    btn.addEventListener('click', () => deleteRecurringRule(btn.dataset.id));
+  });
+}
+
 // ─── Add Expense ──────────────────────────────────────────────────────────────
 
 async function addExpense(e) {
@@ -313,6 +388,7 @@ async function addExpense(e) {
   const errorEl = document.getElementById('form-error');
   errorEl.textContent = '';
 
+<<<<<<< HEAD
   const today = getTodayIsoDate();
   const selectedDate = document.getElementById('date').value;
   if (selectedDate > today) {
@@ -321,19 +397,39 @@ async function addExpense(e) {
     showToast(msg, 'error');
     return;
   }
+=======
+  const recurrence = document.getElementById('recurrence').value;
+  const recurrenceEndDate = document.getElementById('recurrence-end-date').value;
+>>>>>>> feature/recurring-expenses-20260306
 
   const payload = {
     amount: parseFloat(document.getElementById('amount').value),
     category: document.getElementById('category').value,
     description: document.getElementById('description').value.trim(),
+<<<<<<< HEAD
     date: selectedDate,
+=======
+    date: document.getElementById('date').value,
+    recurrence,
+>>>>>>> feature/recurring-expenses-20260306
   };
+
+  if (recurrence !== 'none' && recurrenceEndDate) {
+    payload.recurrenceEndDate = recurrenceEndDate;
+  }
 
   try {
     await apiFetch('/expenses', { method: 'POST', body: JSON.stringify(payload) });
     document.getElementById('expense-form').reset();
     // Reset date to today
+<<<<<<< HEAD
     document.getElementById('date').value = today;
+=======
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('recurrence').value = 'none';
+    document.getElementById('recurrence-end-date').value = '';
+    toggleRecurrenceEndDate();
+>>>>>>> feature/recurring-expenses-20260306
     showToast('Expense added!', 'success');
     await refresh();
   } catch (err) {
@@ -354,14 +450,36 @@ async function deleteExpense(id) {
   }
 }
 
+async function toggleRecurringRule(id, isPaused) {
+  try {
+    await apiFetch(`/recurring-rules/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ paused: !isPaused }),
+    });
+    showToast(isPaused ? 'Recurring schedule resumed.' : 'Recurring schedule paused.', 'default');
+    await refresh();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteRecurringRule(id) {
+  try {
+    await apiFetch(`/recurring-rules/${id}`, { method: 'DELETE' });
+    showToast('Recurring schedule deleted.', 'default');
+    await refresh();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 // ─── Refresh All ──────────────────────────────────────────────────────────────
 
 async function refresh() {
-  await Promise.all([loadSummary(), loadExpenses()]);
+  await Promise.all([loadSummary(), loadExpenses(), loadRecurringRules()]);
 }
 
 // ─── Chart Tab Switching ──────────────────────────────────────────────────────
-
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -370,21 +488,34 @@ function initTabs() {
 
       const tab = btn.dataset.tab;
       document.getElementById('chart-category').classList.toggle('hidden', tab !== 'category');
-      document.getElementById('chart-monthly').classList.toggle('hidden', tab !== 'monthly');
+
     });
   });
-}
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
 function initFilters() {
   document.getElementById('filter-category').addEventListener('change', loadExpenses);
-  document.getElementById('filter-month').addEventListener('change', loadExpenses);
   document.getElementById('clear-filters').addEventListener('click', () => {
-    document.getElementById('filter-category').value = '';
+    date: selectedDate,
     document.getElementById('filter-month').value = '';
-    loadExpenses();
   });
+}
+
+function toggleRecurrenceEndDate() {
+  const recurrence = document.getElementById('recurrence').value;
+  const input = document.getElementById('recurrence-end-date');
+    group.classList.add('hidden');
+    input.value = '';
+    return;
+  document.getElementById('date').value = today;
+
+  group.classList.remove('hidden');
+}
+
+function initRecurrenceFields() {
+  document.getElementById('recurrence').addEventListener('change', toggleRecurrenceEndDate);
+  toggleRecurrenceEndDate();
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
@@ -402,6 +533,7 @@ async function init() {
   document.getElementById('expense-form').addEventListener('submit', addExpense);
   initTabs();
   initFilters();
+  initRecurrenceFields();
 
   await loadCategories();
   await refresh();
