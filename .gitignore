@@ -1,0 +1,18 @@
+# Node dependencies
+node_modules/
+package-lock.json
+
+# Coverage reports
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
