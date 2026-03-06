@@ -34,8 +34,13 @@ function getTodayIsoDate() {
   return local.toISOString().split('T')[0];
 }
 
+const DESCRIPTION_MAX_LENGTH = 500;
+const AMOUNT_MAX = 1000000;
+
 function isValidIsoDateString(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(value + 'T00:00:00');
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(value);
 }
 
 // --- Routes ---
@@ -54,6 +59,9 @@ app.get('/api/expenses', (req, res) => {
   }
 
   if (req.query.month) {
+    if (!/^\d{4}-\d{2}$/.test(req.query.month)) {
+      return res.status(400).json({ error: 'month filter must be in YYYY-MM format' });
+    }
     result = result.filter(e => e.date.startsWith(req.query.month));
   }
 
@@ -71,12 +79,20 @@ app.post('/api/expenses', (req, res) => {
     return res.status(400).json({ error: 'amount must be a positive number' });
   }
 
+  if (Number(amount) > AMOUNT_MAX) {
+    return res.status(400).json({ error: `amount must not exceed ${AMOUNT_MAX}` });
+  }
+
   if (!category || !CATEGORIES.includes(category)) {
     return res.status(400).json({ error: `category must be one of: ${CATEGORIES.join(', ')}` });
   }
 
   if (!description || description.trim() === '') {
     return res.status(400).json({ error: 'description is required' });
+  }
+
+  if (description.trim().length > DESCRIPTION_MAX_LENGTH) {
+    return res.status(400).json({ error: `description must not exceed ${DESCRIPTION_MAX_LENGTH} characters` });
   }
 
   if (!isValidIsoDateString(finalDate)) {

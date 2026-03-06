@@ -38,6 +38,14 @@ describe('POST /api/expenses', () => {
     expect(res.body.error).toMatch(/amount/);
   });
 
+  it('rejects amount exceeding maximum', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .send({ amount: 1000001, category: 'Food', description: 'Huge', date: '2025-03-01' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/amount/);
+  });
+
   it('rejects invalid category', async () => {
     const res = await request(app)
       .post('/api/expenses')
@@ -50,6 +58,14 @@ describe('POST /api/expenses', () => {
     const res = await request(app)
       .post('/api/expenses')
       .send({ amount: 10, category: 'Food', description: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/description/);
+  });
+
+  it('rejects description exceeding maximum length', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .send({ amount: 10, category: 'Food', description: 'x'.repeat(501), date: '2025-03-01' });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/description/);
   });
@@ -70,6 +86,22 @@ describe('POST /api/expenses', () => {
       .send({ amount: 10, category: 'Food', description: 'Planned meal', date: futureDate });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/future/);
+  });
+
+  it('rejects impossible dates like 2025-13-01', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .send({ amount: 10, category: 'Food', description: 'Bad date', date: '2025-13-01' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/date/);
+  });
+
+  it('rejects impossible dates like 2025-02-30', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .send({ amount: 10, category: 'Food', description: 'Bad date', date: '2025-02-30' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/date/);
   });
 });
 
@@ -103,6 +135,12 @@ describe('GET /api/expenses', () => {
     const res = await request(app).get('/api/expenses');
     const dates = res.body.map(e => e.date);
     expect(dates[0] >= dates[1]).toBe(true);
+  });
+
+  it('returns 400 for invalid month filter format', async () => {
+    const res = await request(app).get('/api/expenses?month=March-2025');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/month/);
   });
 });
 
