@@ -262,6 +262,27 @@ Test coverage includes:
 - Cannot add expense: inspect error message below the form and API response message
 - Future date blocked: expected behavior by design on both frontend and backend
 
+## Prompts Used
+
+### Repository setup prompt
+
+When creating the repo, we entered the requirements from the Challenge page README, copying everything up to Quick Start Tips.
+
+### Agent mode prompts used in VS Code
+
+After setup completed, we cloned the repo and used VS Code agent mode with these prompts:
+
+- `Provide the running instructions and then run it`
+- `Format the date picker to prevent selecting future dates. Add this to the expense date selector validation.`
+- `Add full documentation to the README file`
+
+### Outcome
+
+- Running instructions were provided and the app was run.
+- A bug was identified allowing future expense dates.
+- The date picker and expense date validation were updated to block future dates.
+- Full README documentation was added.
+
 ## License
 
 No license file is currently defined in this repository.
