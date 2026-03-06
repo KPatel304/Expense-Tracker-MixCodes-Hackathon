@@ -28,6 +28,16 @@ let expenses = [];
 // Predefined categories
 const CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Health', 'Education', 'Other'];
 
+function getTodayIsoDate() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().split('T')[0];
+}
+
+function isValidIsoDateString(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 // --- Routes ---
 
 // GET /api/categories — list available categories
@@ -55,6 +65,7 @@ app.get('/api/expenses', (req, res) => {
 // POST /api/expenses — add a new expense
 app.post('/api/expenses', (req, res) => {
   const { amount, category, description, date } = req.body;
+  const finalDate = date || getTodayIsoDate();
 
   if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ error: 'amount must be a positive number' });
@@ -68,12 +79,20 @@ app.post('/api/expenses', (req, res) => {
     return res.status(400).json({ error: 'description is required' });
   }
 
+  if (!isValidIsoDateString(finalDate)) {
+    return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+  }
+
+  if (finalDate > getTodayIsoDate()) {
+    return res.status(400).json({ error: 'date cannot be in the future' });
+  }
+
   const expense = {
     id: uuidv4(),
     amount: Math.round(parseFloat(amount) * 100) / 100,
     category,
     description: description.trim(),
-    date: date || new Date().toISOString().split('T')[0],
+    date: finalDate,
     createdAt: new Date().toISOString(),
   };
 

@@ -39,6 +39,12 @@ function showToast(message, type = 'default') {
   setTimeout(() => { toast.className = 'toast'; }, 3000);
 }
 
+function getTodayIsoDate() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().split('T')[0];
+}
+
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
 async function apiFetch(path, options = {}) {
@@ -251,10 +257,10 @@ function renderExpenseList(expenses) {
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // ─── Add Expense ──────────────────────────────────────────────────────────────
@@ -264,18 +270,27 @@ async function addExpense(e) {
   const errorEl = document.getElementById('form-error');
   errorEl.textContent = '';
 
+  const today = getTodayIsoDate();
+  const selectedDate = document.getElementById('date').value;
+  if (selectedDate > today) {
+    const msg = 'Expense date cannot be in the future';
+    errorEl.textContent = msg;
+    showToast(msg, 'error');
+    return;
+  }
+
   const payload = {
     amount: parseFloat(document.getElementById('amount').value),
     category: document.getElementById('category').value,
     description: document.getElementById('description').value.trim(),
-    date: document.getElementById('date').value,
+    date: selectedDate,
   };
 
   try {
     await apiFetch('/expenses', { method: 'POST', body: JSON.stringify(payload) });
     document.getElementById('expense-form').reset();
     // Reset date to today
-    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
     showToast('Expense added!', 'success');
     await refresh();
   } catch (err) {
@@ -332,8 +347,12 @@ function initFilters() {
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Set today as default date
-  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('date');
+  const today = getTodayIsoDate();
+
+  // Prevent selecting dates after today
+  dateInput.max = today;
+  dateInput.value = today;
 
   document.getElementById('expense-form').addEventListener('submit', addExpense);
   initTabs();

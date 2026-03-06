@@ -62,6 +62,15 @@ describe('POST /api/expenses', () => {
     expect(res.status).toBe(201);
     expect(res.body.date).toBe(today);
   });
+
+  it('rejects future dates', async () => {
+    const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const res = await request(app)
+      .post('/api/expenses')
+      .send({ amount: 10, category: 'Food', description: 'Planned meal', date: futureDate });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/future/);
+  });
 });
 
 describe('GET /api/expenses', () => {
