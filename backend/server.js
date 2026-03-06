@@ -24,9 +24,98 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 // In-memory expense storage (data is not persisted across server restarts)
 let expenses = [];
+let recurringRules = [];
 
 // Predefined categories
 const CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Health', 'Education', 'Other'];
+const RECURRENCE_TYPES = ['none', 'daily', 'weekly', 'monthly'];
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function isValidISODate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().split('T')[0] === value;
+}
+
+function formatISODate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(dateStr, days) {
+  const date = new Date(`${dateStr}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatISODate(date);
+}
+
+function addOneMonth(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const targetMonthIndex = month;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth = (targetMonthIndex % 12) + 1;
+  const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+  const nextDay = Math.min(day, lastDay);
+  return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`;
+}
+
+function nextDateByRecurrence(dateStr, recurrence) {
+  if (recurrence === 'daily') return addDays(dateStr, 1);
+  if (recurrence === 'weekly') return addDays(dateStr, 7);
+  if (recurrence === 'monthly') return addOneMonth(dateStr);
+  return dateStr;
+}
+
+function createExpense({ amount, category, description, date, recurringRuleId = null, recurrence = 'none', isRecurringSeed = false }) {
+  return {
+    id: uuidv4(),
+    amount: Math.round(parseFloat(amount) * 100) / 100,
+    category,
+    description: description.trim(),
+    date,
+    recurrence,
+    recurringRuleId,
+    isRecurringSeed,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function generateRecurringExpenses(referenceDate = todayISO()) {
+  for (const rule of recurringRules) {
+    if (rule.paused) {
+      continue;
+    }
+
+    let safety = 0;
+
+    while (rule.nextDate <= referenceDate && safety < 2000) {
+      if (rule.endDate && rule.nextDate > rule.endDate) break;
+
+      const alreadyExists = expenses.some(
+        e => e.recurringRuleId === rule.id && e.date === rule.nextDate,
+      );
+
+      if (!alreadyExists) {
+        expenses.push(createExpense({
+          amount: rule.amount,
+          category: rule.category,
+          description: rule.description,
+          date: rule.nextDate,
+          recurringRuleId: rule.id,
+          recurrence: rule.recurrence,
+          isRecurringSeed: false,
+        }));
+      }
+
+      rule.nextDate = nextDateByRecurrence(rule.nextDate, rule.recurrence);
+      safety += 1;
+    }
+  }
+}
 
 // --- Routes ---
 
@@ -37,6 +126,7 @@ app.get('/api/categories', (req, res) => {
 
 // GET /api/expenses — list all expenses (supports ?category= and ?month=YYYY-MM filters)
 app.get('/api/expenses', (req, res) => {
+  generateRecurringExpenses();
   let result = [...expenses];
 
   if (req.query.category) {
@@ -52,9 +142,29 @@ app.get('/api/expenses', (req, res) => {
   res.json(result);
 });
 
+// GET /api/recurring-rules — list recurring schedules
+app.get('/api/recurring-rules', (req, res) => {
+  const rules = [...recurringRules]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map(rule => ({
+      id: rule.id,
+      amount: rule.amount,
+      category: rule.category,
+      description: rule.description,
+      recurrence: rule.recurrence,
+      startDate: rule.startDate,
+      nextDate: rule.nextDate,
+      endDate: rule.endDate,
+      paused: rule.paused,
+      createdAt: rule.createdAt,
+    }));
+
+  res.json(rules);
+});
+
 // POST /api/expenses — add a new expense
 app.post('/api/expenses', (req, res) => {
-  const { amount, category, description, date } = req.body;
+  const { amount, category, description, date, recurrence = 'none', recurrenceEndDate } = req.body;
 
   if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ error: 'amount must be a positive number' });
@@ -68,17 +178,78 @@ app.post('/api/expenses', (req, res) => {
     return res.status(400).json({ error: 'description is required' });
   }
 
-  const expense = {
-    id: uuidv4(),
-    amount: Math.round(parseFloat(amount) * 100) / 100,
+  if (!RECURRENCE_TYPES.includes(recurrence)) {
+    return res.status(400).json({ error: `recurrence must be one of: ${RECURRENCE_TYPES.join(', ')}` });
+  }
+
+  const expenseDate = date || todayISO();
+  if (!isValidISODate(expenseDate)) {
+    return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+  }
+
+  if (recurrenceEndDate && !isValidISODate(recurrenceEndDate)) {
+    return res.status(400).json({ error: 'recurrenceEndDate must be in YYYY-MM-DD format' });
+  }
+
+  if (recurrence !== 'none' && recurrenceEndDate && recurrenceEndDate < expenseDate) {
+    return res.status(400).json({ error: 'recurrenceEndDate must be on or after date' });
+  }
+
+  let recurringRuleId = null;
+  if (recurrence !== 'none') {
+    recurringRuleId = uuidv4();
+    recurringRules.push({
+      id: recurringRuleId,
+      amount: Number(amount),
+      category,
+      description: description.trim(),
+      recurrence,
+      startDate: expenseDate,
+      nextDate: nextDateByRecurrence(expenseDate, recurrence),
+      endDate: recurrenceEndDate || null,
+      paused: false,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  const expense = createExpense({
+    amount,
     category,
-    description: description.trim(),
-    date: date || new Date().toISOString().split('T')[0],
-    createdAt: new Date().toISOString(),
-  };
+    description,
+    date: expenseDate,
+    recurrence,
+    recurringRuleId,
+    isRecurringSeed: recurrence !== 'none',
+  });
 
   expenses.push(expense);
   res.status(201).json(expense);
+});
+
+// PATCH /api/recurring-rules/:id — pause/resume a schedule
+app.patch('/api/recurring-rules/:id', (req, res) => {
+  const rule = recurringRules.find(r => r.id === req.params.id);
+  if (!rule) {
+    return res.status(404).json({ error: 'Recurring rule not found' });
+  }
+
+  if (typeof req.body.paused !== 'boolean') {
+    return res.status(400).json({ error: 'paused must be a boolean' });
+  }
+
+  rule.paused = req.body.paused;
+  res.json(rule);
+});
+
+// DELETE /api/recurring-rules/:id — remove a recurring schedule
+app.delete('/api/recurring-rules/:id', (req, res) => {
+  const index = recurringRules.findIndex(r => r.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Recurring rule not found' });
+  }
+
+  const deleted = recurringRules.splice(index, 1)[0];
+  res.json(deleted);
 });
 
 // DELETE /api/expenses/:id — remove an expense
@@ -88,11 +259,17 @@ app.delete('/api/expenses/:id', (req, res) => {
     return res.status(404).json({ error: 'Expense not found' });
   }
   const deleted = expenses.splice(index, 1)[0];
+
+  if (deleted.isRecurringSeed && deleted.recurringRuleId) {
+    recurringRules = recurringRules.filter(rule => rule.id !== deleted.recurringRuleId);
+  }
+
   res.json(deleted);
 });
 
 // GET /api/summary — spending summary (monthly total + category breakdown)
 app.get('/api/summary', (req, res) => {
+  generateRecurringExpenses();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -143,4 +320,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, expenses: () => expenses, resetExpenses: () => { expenses = []; } };
+module.exports = {
+  app,
+  expenses: () => expenses,
+  resetExpenses: () => {
+    expenses = [];
+    recurringRules = [];
+  },
+};
