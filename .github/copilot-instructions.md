@@ -7,7 +7,7 @@ These instructions define coding standards for this repository.
 - Full-stack JavaScript app.
 - Backend: Express API in `backend/server.js`.
 - Frontend: static HTML/CSS/JS in `frontend/`.
-- Data storage is in-memory (`expenses` array), so behavior must remain deterministic and simple.
+- Data storage is in-memory (`expenses` array), so overall behavior should remain simple and predictable; IDs and timestamps are expected to vary between runs.
 
 ## Core Principles
 
