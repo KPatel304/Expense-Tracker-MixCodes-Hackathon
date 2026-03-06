@@ -3,6 +3,7 @@
    ============================================================ */
 
 const API = '/api';
+const THEME_STORAGE_KEY = 'expense-tracker-theme';
 
 // Category emoji map
 const CATEGORY_ICONS = {
@@ -25,6 +26,48 @@ const CHART_COLORS = [
 let categoryChart = null;
 let monthlyChart = null;
 let allCategories = [];
+let currentTheme = 'light';
+
+function cssVar(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
+
+function applyChartTheme() {
+  if (!window.Chart || !Chart.defaults) return;
+  Chart.defaults.color = cssVar('--text-muted');
+  Chart.defaults.borderColor = cssVar('--border');
+}
+
+function updateThemeToggleButton() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const isDark = currentTheme === 'dark';
+  btn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+  btn.setAttribute('aria-pressed', String(isDark));
+}
+
+function setTheme(theme) {
+  currentTheme = theme === 'dark' ? 'dark' : 'light';
+  document.body.setAttribute('data-theme', currentTheme);
+  localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
+  applyChartTheme();
+  updateThemeToggleButton();
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initialTheme = saved || (prefersDark ? 'dark' : 'light');
+  setTheme(initialTheme);
+
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      await loadSummary();
+    });
+  }
+}
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
@@ -127,7 +170,7 @@ function renderCategoryChart(byCategory) {
         data,
         backgroundColor: CHART_COLORS.slice(0, labels.length),
         borderWidth: 2,
-        borderColor: '#fff',
+        borderColor: cssVar('--surface'),
       }],
     },
     options: {
@@ -194,7 +237,7 @@ function renderMonthlyChart(monthlyBreakdown) {
         y: {
           beginAtZero: true,
           ticks: { callback: v => fmt(v) },
-          grid: { color: 'rgba(0,0,0,0.05)' },
+          grid: { color: cssVar('--border') },
         },
         x: { grid: { display: false } },
       },
@@ -347,6 +390,8 @@ function initFilters() {
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
 async function init() {
+  initTheme();
+
   const dateInput = document.getElementById('date');
   const today = getTodayIsoDate();
 

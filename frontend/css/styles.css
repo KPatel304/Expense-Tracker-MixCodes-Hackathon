@@ -18,6 +18,21 @@
   --font: 'Segoe UI', BlinkMacSystemFont, system-ui, -apple-system, sans-serif;
 }
 
+body[data-theme='dark'] {
+  --primary: #8b84ff;
+  --primary-dark: #776ef0;
+  --primary-light: rgba(139, 132, 255, 0.22);
+  --danger: #f87171;
+  --danger-light: rgba(248, 113, 113, 0.2);
+  --success: #34d399;
+  --bg: #141624;
+  --surface: #1d2030;
+  --border: #313652;
+  --text: #f1f2ff;
+  --text-muted: #b1b5d6;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -53,6 +68,12 @@ header {
   justify-content: space-between;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; }
 
 #current-month-label {
@@ -61,6 +82,27 @@ header {
   background: rgba(255,255,255,0.15);
   padding: 4px 12px;
   border-radius: 20px;
+}
+
+.theme-toggle {
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+body[data-theme='dark'] .theme-toggle {
+  border-color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.08);
 }
 
 /* ============================================================
@@ -429,6 +471,15 @@ main {
 .cat-Education   { background: #fff8e1; color: #e65100; }
 .cat-Other       { background: #f3f4f6; color: #374151; }
 
+body[data-theme='dark'] .cat-Food        { background: #4b2b13; color: #ffd3b0; }
+body[data-theme='dark'] .cat-Transport   { background: #1b3553; color: #b8daff; }
+body[data-theme='dark'] .cat-Entertainment { background: #4b1f3f; color: #ffc4e6; }
+body[data-theme='dark'] .cat-Shopping    { background: #1f4a34; color: #c7f5d4; }
+body[data-theme='dark'] .cat-Bills       { background: #322453; color: #d6c7ff; }
+body[data-theme='dark'] .cat-Health      { background: #164441; color: #bdf3ec; }
+body[data-theme='dark'] .cat-Education   { background: #4a3b17; color: #ffe7a8; }
+body[data-theme='dark'] .cat-Other       { background: #374151; color: #e5e7eb; }
+
 /* ============================================================
    Responsive
    ============================================================ */
@@ -439,6 +490,15 @@ main {
 }
 
 @media (max-width: 600px) {
+  .header-actions {
+    gap: 8px;
+  }
+
+  .theme-toggle {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+
   .summary-cards {
     grid-template-columns: 1fr;
   }
